@@ -1587,6 +1587,8 @@ add_host_pattern(const char *pattern, unsigned host_timeout) {
          err_msg("ERROR: Invalid range specification: %s is not a valid IPv4 "
                  "address", cp);
       hostend = ntohl(in_val.s_addr); /* We need host byte order */
+      if (hoststart > hostend)
+         err_msg("ERROR: Invalid range specification: start address is greater than end address");
       /*
        * Calculate all host addresses in the range and feed to add_host()
        * in dotted-quad format.

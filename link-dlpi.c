@@ -115,7 +115,7 @@ link_match_ppa(link_t *handle, const char *device) {
 
    for (p = buf; p < buf + len; p += strlen(p) + 1) {
       ppa = -1;
-      if (sscanf(p, "%s (PPA %d)\n", dev, &ppa) != 2)
+      if (sscanf(p, "%15s (PPA %d)\n", dev, &ppa) != 2)
          break;
       if (strcmp(dev, device) == 0)
          break;
