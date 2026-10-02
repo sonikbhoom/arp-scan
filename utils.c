@@ -33,31 +33,6 @@ static uid_t euid;
 #endif
 
 /*
- *	timeval_diff -- Calculates the difference between two timevals
- *	and returns this difference in a third timeval.
- *
- *	Inputs:
- *
- *	a       = First timeval
- *	b       = Second timeval
- *	diff    = Difference between timevals (a - b).
- *
- *	Returns:
- *
- *	None.
- */
-void
-timeval_diff(const struct timeval *a, const struct timeval *b,
-             struct timeval *diff) {
-   diff->tv_sec = a->tv_sec - b->tv_sec;
-   diff->tv_usec = a->tv_usec - b->tv_usec;
-   if (diff->tv_usec < 0) {
-      diff->tv_sec--;
-      diff->tv_usec += 1000000;
-   }
-}
-
-/*
  *	hstr_i -- Convert two-digit hex string to unsigned integer
  *
  *	Inputs:

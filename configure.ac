@@ -2,6 +2,7 @@
 
 AC_INIT([arp-scan],[1.10.1-git],[https://github.com/royhills/arp-scan])
 AC_PREREQ([2.70])
+AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([arp-scan.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
@@ -57,6 +58,7 @@ AC_PROG_INSTALL
 # Everything needs -lpcap for pcap_open_live() and other functions.
 AC_SEARCH_LIBS([gethostbyname], [nsl])
 AC_SEARCH_LIBS([socket], [socket])
+AC_SEARCH_LIBS([clock_gettime], [rt])
 AC_SEARCH_LIBS([pcap_open_live], [pcap], ,
    [
    AC_MSG_NOTICE([Cannot find pcap library containing pcap_open_live])
@@ -86,7 +88,7 @@ CHECK_LIBCAP
 # Checks for header files.
 
 # Check for C POSIX library header files
-AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h unistd.h sys/stat.h fcntl.h search.h regex.h])
+AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h sys/select.h time.h unistd.h sys/stat.h fcntl.h search.h regex.h])
 
 # Check for other required header files
 AC_CHECK_HEADERS([getopt.h pcap.h sys/ioctl.h ifaddrs.h])
@@ -96,7 +98,19 @@ AC_TYPE_SIZE_T
 
 # Checks for library functions.
 # All of these are defined by POSIX
-AC_CHECK_FUNCS([malloc gethostbyname gettimeofday inet_ntoa memset select socket strerror])
+AC_CHECK_FUNCS([malloc gethostbyname clock_gettime pselect inet_ntoa memset socket strerror])
+AS_IF([test "x$ac_cv_func_clock_gettime" != "xyes"],
+   [AC_MSG_ERROR([clock_gettime is required])])
+AS_IF([test "x$ac_cv_func_pselect" != "xyes"],
+   [AC_MSG_ERROR([pselect is required])])
+AC_CHECK_DECLS([clock_gettime], [],
+   [AC_MSG_ERROR([clock_gettime is required])],
+   [[#include <time.h>]])
+AC_CHECK_DECLS([pselect], [],
+   [AC_MSG_ERROR([pselect is required])],
+   [[#include <signal.h>
+     #include <sys/select.h>
+     #include <time.h>]])
 # These functions might not be present on all systems
 AC_CHECK_FUNCS([getifaddrs pledge])
 
