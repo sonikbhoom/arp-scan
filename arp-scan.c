@@ -96,17 +96,17 @@ static int exclude_broadcast = 0;	/* Exclude network & broadcast address */
 
 int
 main(int argc, char *argv[]) {
-   struct timeval now;
-   struct timeval diff;         /* Difference between two timevals */
-   int select_timeout;          /* Select timeout */
+   struct timespec now;
+   struct timespec diff;        /* Difference between two timespecs */
+   int select_timeout;          /* pselect timeout in microseconds */
    uint64_t loop_timediff;    /* Time since last packet sent in us */
    uint64_t host_timediff; /* Time since last pkt sent to this host (us) */
-   struct timeval last_packet_time;     /* Time last packet was sent */
+   struct timespec last_packet_time; /* Monotonic time last packet was sent */
    int req_interval;            /* Requested per-packet interval */
    int cum_err = 0;             /* Cumulative timing error */
-   struct timeval start_time;   /* Program start time */
-   struct timeval end_time;     /* Program end time */
-   struct timeval elapsed_time; /* Elapsed time as timeval */
+   struct timespec start_time;  /* Program start time */
+   struct timespec end_time;    /* Program end time */
+   struct timespec elapsed_time; /* Elapsed time as timespec */
    double elapsed_seconds;      /* Elapsed time in seconds */
    int reset_cum_err;
    int pass_no = 0;
@@ -149,7 +149,7 @@ main(int argc, char *argv[]) {
    /*
     * Get program start time for statistics displayed on completion.
     */
-   Gettimeofday(&start_time);
+   Clock_gettime(CLOCK_MONOTONIC, &start_time);
    /*
     * Open the network device for reading with pcap, or the pcap file if we
     * have specified --readpktfromfile. If we are writing packets to a binary
@@ -481,10 +481,10 @@ main(int argc, char *argv[]) {
        * Otherwise, seed the RNG with an unpredictable value.
        */
       if (!random_seed) {
-         struct timeval tv;
+         struct timespec tv;
 
-         Gettimeofday(&tv);
-         random_seed = tv.tv_usec ^ getpid(); /* Unpredictable value */
+         Clock_gettime(CLOCK_REALTIME, &tv);
+         random_seed = tv.tv_nsec ^ getpid(); /* Unpredictable value */
       }
       init_genrand(random_seed);
 
@@ -502,7 +502,7 @@ main(int argc, char *argv[]) {
    live_count = num_hosts;
    cursor = helistptr;
    last_packet_time.tv_sec = 0;
-   last_packet_time.tv_usec = 0;
+   last_packet_time.tv_nsec = 0;
    /*
     * Calculate the required interval to achieve the required outgoing
     * bandwidth unless the interval was manually specified with --interval.
@@ -547,21 +547,21 @@ main(int argc, char *argv[]) {
        * Obtain current time and calculate deltas since last packet and
        * last packet to this host.
        */
-      Gettimeofday(&now);
+      Clock_gettime(CLOCK_MONOTONIC, &now);
       /*
        * If the last packet was sent more than interval microseconds ago, we
        * can potentially send a packet to the current host.
        */
-      timeval_diff(&now, &last_packet_time, &diff);
-      loop_timediff = (uint64_t)1000000*diff.tv_sec + diff.tv_usec;
+      timespec_diff(&now, &last_packet_time, &diff);
+      loop_timediff = (uint64_t)1000000*diff.tv_sec + diff.tv_nsec/1000;
       if (loop_timediff >= (unsigned)req_interval) {
          /*
           * If the last packet to this host was sent more than the current
           * timeout for this host us ago, then we can potentially send a packet
           * to it.
           */
-         timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-         host_timediff = (uint64_t)1000000*diff.tv_sec + diff.tv_usec;
+         timespec_diff(&now, &((*cursor)->last_send_time), &diff);
+         host_timediff = (uint64_t)1000000*diff.tv_sec + diff.tv_nsec/1000;
          if (host_timediff >= (*cursor)->timeout) {
             if (reset_cum_err) {
                cum_err = 0;
@@ -588,9 +588,9 @@ main(int argc, char *argv[]) {
                            my_ntoa((*cursor)->addr));
                remove_host(cursor); /* Automatically calls advance_cursor() */
                if (first_timeout) {
-                  timeval_diff(&now, &((*cursor)->last_send_time), &diff);
+                  timespec_diff(&now, &((*cursor)->last_send_time), &diff);
                   host_timediff = (uint64_t)1000000*diff.tv_sec +
-                                  diff.tv_usec;
+                                  diff.tv_nsec/1000;
                   while (host_timediff >= (*cursor)->timeout && live_count) {
                      if ((*cursor)->live) {
                         if (verbose > 1)
@@ -600,13 +600,13 @@ main(int argc, char *argv[]) {
                      } else {
                         advance_cursor();
                      }
-                     timeval_diff(&now, &((*cursor)->last_send_time), &diff);
+                     timespec_diff(&now, &((*cursor)->last_send_time), &diff);
                      host_timediff = (uint64_t)1000000*diff.tv_sec +
-                                     diff.tv_usec;
+                                     diff.tv_nsec/1000;
                   }
                   first_timeout = 0;
                }
-               Gettimeofday(&last_packet_time);
+               Clock_gettime(CLOCK_MONOTONIC, &last_packet_time);
             } else { /* Retry limit not reached for this host */
                if ((*cursor)->num_sent)
                   (*cursor)->timeout *= backoff_factor;
@@ -635,10 +635,10 @@ main(int argc, char *argv[]) {
    if (write_pkt_to_file)
       close(write_pkt_to_file);
 
-   Gettimeofday(&end_time);
-   timeval_diff(&end_time, &start_time, &elapsed_time);
+   Clock_gettime(CLOCK_MONOTONIC, &end_time);
+   timespec_diff(&end_time, &start_time, &elapsed_time);
    elapsed_seconds = (elapsed_time.tv_sec*1000 +
-                      elapsed_time.tv_usec/1000) / 1000.0;
+                      elapsed_time.tv_nsec/1000000) / 1000.0;
 
    if (!plain_flag) {
       printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec). %u "
@@ -829,18 +829,18 @@ display_packet(host_entry *he, arp_ether_ipv4 *arpei,
        * RTT field, present if the --rtt option is given
        */
       if (rtt_flag) {
-         struct timeval rtt;
-         struct timeval pcap_timestamp;
+         struct timespec rtt;
+         struct timespec pcap_timestamp;
          unsigned long rtt_us; /* round-trip time in microseconds */
          /*
-          * We can't pass a pointer to pcap_header->ts directly to timeval_diff
-          * because it may not have the same size as a struct timeval.
+          * We can't pass a pointer to pcap_header->ts directly to timespec_diff
+          * because it may not have the same size as a struct timespec.
           * E.g. OpenBSD 5.1 on amd64.
           */
          pcap_timestamp.tv_sec = pcap_header->ts.tv_sec;
-         pcap_timestamp.tv_usec = pcap_header->ts.tv_usec;
-         timeval_diff(&pcap_timestamp, &(he->last_send_time), &rtt);
-         rtt_us = rtt.tv_sec * 1000000 + rtt.tv_usec;
+         pcap_timestamp.tv_nsec = pcap_header->ts.tv_usec * 1000;
+         timespec_diff(&pcap_timestamp, &(he->last_send_realtime), &rtt);
+         rtt_us = rtt.tv_sec * 1000000 + rtt.tv_nsec / 1000;
          fields[10].value=make_message("%lu.%03lu", rtt_us/1000, rtt_us%1000);
       }
    } /* End if (!quiet_flag) */
@@ -998,14 +998,14 @@ display_packet(host_entry *he, arp_ether_ipv4 *arpei,
  */
 int
 send_packet(pcap_t *pcap_handle, host_entry *he,
-            struct timeval *last_packet_time) {
+            struct timespec *last_packet_time) {
    unsigned char buf[MAX_FRAME];
    size_t buflen;
    ether_hdr frame_hdr;
    arp_ether_ipv4 arpei;
    int nsent = 0;
    unsigned i;
-   struct timeval to;
+   struct timespec to;
    int n;
    /*
     * Construct Ethernet frame header
@@ -1054,9 +1054,9 @@ send_packet(pcap_t *pcap_handle, host_entry *he,
    /*
     * Update the last send times for this host.
     */
-   Gettimeofday(last_packet_time);
-   he->last_send_time.tv_sec  = last_packet_time->tv_sec;
-   he->last_send_time.tv_usec = last_packet_time->tv_usec;
+   Clock_gettime(CLOCK_MONOTONIC, last_packet_time);
+   he->last_send_time = *last_packet_time;
+   Clock_gettime(CLOCK_REALTIME, &he->last_send_realtime);
    he->num_sent++;
    /*
     * If we are using the undocumented --readpktfromfile option, don't send
@@ -1074,8 +1074,7 @@ send_packet(pcap_t *pcap_handle, host_entry *he,
    if (write_pkt_to_file) { /* Writing to file */
       nsent = write(write_pkt_to_file, buf, buflen);
    } else { /* Send packet to Ethernet adaptor */
-      to.tv_sec  = retry_send_interval/1000000;
-      to.tv_usec = (retry_send_interval - 1000000*to.tv_sec);
+      microseconds_to_timespec(retry_send_interval, &to);
       for (i=0; i<retry_send; i++) {
           nsent = pcap_sendpacket(pcap_handle, buf, buflen);
           if (nsent >= 0) { /* Successfully sent packet */
@@ -1087,9 +1086,9 @@ send_packet(pcap_t *pcap_handle, host_entry *he,
               if (verbose)
                  warn_msg("---\tRetrying send after %d microsecond delay (#%d of %d)",
                           retry_send_interval, i, retry_send);
-              n = select(0, NULL, NULL, NULL, &to); /* Delay */
+              n = pselect(0, NULL, NULL, NULL, &to, NULL); /* Delay */
               if (n < 0) {
-                 err_sys("select");
+                 err_sys("pselect");
               }
           }
       }
@@ -1673,7 +1672,9 @@ add_host(const char *host_name, unsigned host_timeout, int numeric_only) {
    he->num_sent = 0;
    he->num_recv = 0;
    he->last_send_time.tv_sec = 0;
-   he->last_send_time.tv_usec = 0;
+   he->last_send_time.tv_nsec = 0;
+   he->last_send_realtime.tv_sec = 0;
+   he->last_send_realtime.tv_nsec = 0;
 }
 
 /*
@@ -1793,17 +1794,16 @@ find_host(host_entry **he, struct in_addr *addr) {
 void
 recvfrom_wto(int sock_fd, int tmo, pcap_t *pcap_handle) {
    fd_set readset;
-   struct timeval to;
+   struct timespec to;
    int n;
 
    FD_ZERO(&readset);
    if (sock_fd >= 0)
       FD_SET(sock_fd, &readset);
-   to.tv_sec  = tmo/1000000;
-   to.tv_usec = (tmo - 1000000*to.tv_sec);
-   n = select(sock_fd+1, &readset, NULL, NULL, &to);
+   microseconds_to_timespec((uint64_t)tmo, &to);
+   n = pselect(sock_fd+1, &readset, NULL, NULL, &to, NULL);
    if (n < 0) {
-      err_sys("select");
+      err_sys("pselect");
    } else if (n == 0 && sock_fd >= 0) {
       return; /* Timeout */
    }
