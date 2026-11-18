@@ -2451,6 +2451,7 @@ marshal_arp_pkt(unsigned char *buffer, ether_hdr *frame_hdr,
  *	Returns:
  *
  *	An integer representing the data link framing:
+ * -1 = Truncated packet
  *	0 = Ethernet-II
  *	1 = 802.3 with LLC/SNAP
  *
@@ -2466,6 +2467,10 @@ unmarshal_arp_pkt(const unsigned char *buffer, size_t buf_len,
                   int *vlan_id) {
    const unsigned char *cp;
    int framing = FRAMING_ETHERNET_II;
+   const size_t llc_snap_size = 8;
+
+   if (buf_len < ETHER_HDR_SIZE + ARP_PKT_SIZE)
+      return -1;
 
    cp = buffer;
    /*
@@ -2499,7 +2504,9 @@ unmarshal_arp_pkt(const unsigned char *buffer, size_t buf_len,
     * If this 802.2 LLC header is present, skip it and the SNAP header
     */
    if (*cp == 0xAA && *(cp+1) == 0xAA && *(cp+2) == 0x03) {
-      cp += 8; /* Skip eight bytes */
+      if (buf_len - (size_t)(cp - buffer) < llc_snap_size + ARP_PKT_SIZE)
+         return -1;
+      cp += llc_snap_size;
       framing = FRAMING_LLC_SNAP;
    }
    /*
