@@ -33,18 +33,14 @@
 
 #include "arp-scan.h"
 
-/*
- * We omit the timezone arg from this wrapper since it's obsolete and we never
- * use it.
- */
 int
-Gettimeofday(struct timeval *tv) {
+Clock_gettime(clockid_t clock_id, struct timespec *tp) {
    int result;
 
-   result = gettimeofday(tv, NULL);
+   result = clock_gettime(clock_id, tp);
 
    if (result != 0)
-      err_sys("gettimeofday");
+      err_sys("clock_gettime");
 
    return result;
 }

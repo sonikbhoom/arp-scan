@@ -8,18 +8,19 @@ bin_PROGRAMS = arp-scan
 dist_bin_SCRIPTS = get-oui arp-fingerprint
 #
 dist_check_SCRIPTS = check-run1 check-packet check-decode check-host-list check-ieee-reg check-error check-options check-prng
-check_PROGRAMS = mt19937ar-test
+check_PROGRAMS = mt19937ar-test timespec-test
 mt19937ar_test_SOURCES = mt19937ar-test.c mt19937ar.c mt19937ar.h
+timespec_test_SOURCES = timespec-test.c time-utils.c time-utils.h
 #
 dist_man_MANS = arp-scan.1 get-oui.1 arp-fingerprint.1 mac-vendor.5
 #
-arp_scan_SOURCES = arp-scan.c arp-scan.h error.c wrappers.c utils.c mt19937ar.c format.c mt19937ar.h
+arp_scan_SOURCES = arp-scan.c arp-scan.h error.c wrappers.c utils.c time-utils.c time-utils.h mt19937ar.c format.c mt19937ar.h
 arp_scan_LDADD = $(LIBOBJS)
 #
 dist_pkgsysconf_DATA = mac-vendor.txt
 dist_pkgdata_DATA = ieee-oui.txt
 #
-TESTS = $(dist_check_SCRIPTS)
+TESTS = $(dist_check_SCRIPTS) timespec-test
 EXTRA_DIST = arp-scan.1.dist get-oui.1.dist CONTRIBUTING.md SECURITY.md testdata/pkt-simple-request.dat testdata/pkt-custom-request.dat testdata/pkt-custom-request-padding.dat testdata/pkt-custom-request-llc.dat testdata/pkt-custom-request-vlan.dat testdata/pkt-simple-response.pcap testdata/pkt-padding-response.pcap testdata/pkt-vlan-response.pcap testdata/pkt-llc-response.pcap testdata/pkt-net1921681-response.pcap testdata/pkt-trailer-response.pcap testdata/pkt-vlan-llc-response.pcap testdata/pkt-custom-request-vlan-llc.dat testdata/pkt-dup-response.pcap testdata/pkt-diff-frame-addr.pcap testdata/pkt-local-admin.pcap testdata/pkt-ieee-regcheck.pcap testdata/pkt-too-short.pcap
 #
 # Substitute autoconf pkgdatadir variable in arp-scan.1 manpage

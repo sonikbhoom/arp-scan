@@ -66,6 +66,14 @@
 #include <sys/time.h>
 #endif
 
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+
 /* headers first defined in POSIX.1 issue 6 */
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
@@ -105,6 +113,7 @@
 
 /* Mersenne Twister random number generator prototypes */
 #include "mt19937ar.h"
+#include "time-utils.h"
 
 /* OpenBSD strlcpy prototype */
 #ifndef HAVE_STRLCPY
@@ -175,7 +184,8 @@
 typedef struct {
    unsigned timeout;		/* Timeout for this host in us */
    struct in_addr addr;		/* Host IP address */
-   struct timeval last_send_time; /* Time when last packet sent to this addr */
+   struct timespec last_send_time; /* Monotonic time when last packet was sent */
+   struct timespec last_send_realtime; /* Wall-clock time for RTT calculation */
    unsigned short num_sent;	/* Number of packets sent */
    unsigned short num_recv;	/* Number of packets received */
    unsigned char live;		/* Set when awaiting response */
@@ -251,7 +261,7 @@ const char *my_ntoa(struct in_addr);
 void process_options(int, char *[]);
 void recvfrom_wto(int, int, pcap_t *);
 void remove_host(host_entry **);
-int send_packet(pcap_t *, host_entry *, struct timeval *);
+int send_packet(pcap_t *, host_entry *, struct timespec *);
 int unmarshal_arp_pkt(const unsigned char *, size_t, ether_hdr *,
                       arp_ether_ipv4 *, unsigned char *, size_t *, int *);
 void usage(void);
@@ -284,11 +294,8 @@ void set_capability(cap_status);
 int str_ccmp(const char *, const char *);
 unsigned str_to_bandwidth(const char *);
 unsigned str_to_interval(const char *);
-void timeval_diff(const struct timeval *, const struct timeval *,
-                  struct timeval *);
-
 /* wrappers.c */
-int Gettimeofday(struct timeval *);
+int Clock_gettime(clockid_t, struct timespec *);
 void *Malloc(size_t);
 void *Realloc(void *, size_t);
 long int Strtol(const char *, int);
