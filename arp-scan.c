@@ -2451,7 +2451,7 @@ marshal_arp_pkt(unsigned char *buffer, ether_hdr *frame_hdr,
  *	Returns:
  *
  *	An integer representing the data link framing:
- * -1 = Truncated packet
+ *	-1 = Truncated packet
  *	0 = Ethernet-II
  *	1 = 802.3 with LLC/SNAP
  *
